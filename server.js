@@ -11,7 +11,8 @@ app.get("/", (req, res) => {
   res.send("Frame Grabber API working");
 });
 
-// GET من المتصفح
+// ✅ GET /youtube?url=...
+// كيرجع Redirect للرابط المباشر (مؤقت) ديال الفيديو
 app.get("/youtube", async (req, res) => {
   try {
     const url = req.query.url;
@@ -20,44 +21,38 @@ app.get("/youtube", async (req, res) => {
       return res.status(400).send("No URL provided");
     }
 
+    // حماية بسيطة: غير http/https
+    if (!/^https?:\/\//i.test(url)) {
+      return res.status(400).send("Invalid URL");
+    }
+
+    // yt-dlp-exec كيرجع stdout فـ output
     const output = await ytdlp(url, {
       getUrl: true,
-      format: "best[ext=mp4]/best"
+      format: "best[ext=mp4]/best",
+      addHeader: [
+        "User-Agent: Mozilla/5.0",
+        "Accept-Language: en-US,en;q=0.9",
+      ],
+      extractorArgs: "youtube:player_client=android",
     });
 
     const directUrl = output.toString().trim().split("\n")[0];
 
-    return res.redirect(directUrl);
+    if (!directUrl) {
+      return res.status(500).json({ error: "No direct URL returned" });
+    }
 
+    // redirect للرابط المباشر
+    return res.redirect(directUrl);
   } catch (err) {
     return res.status(500).json({
       error: "yt-dlp failed",
-      details: err.message
+      details: (err?.message || "").slice(0, 5000),
     });
   }
 });
 
-// POST (اختياري)
-app.post("/youtube", async (req, res) => {
-  try {
-    const url = req.body.url;
-
-    const output = await ytdlp(url, {
-      getUrl: true,
-      format: "best[ext=mp4]/best"
-    });
-
-    const directUrl = output.toString().trim().split("\n")[0];
-
-    res.json({ directUrl });
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
+// Render كيعطي PORT ف env
 const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log("Server running on port", PORT);
-});
+app.listen(PORT, () => console.log("Server running on port", PORT));
