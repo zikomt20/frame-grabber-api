@@ -11,35 +11,40 @@ app.get("/", (req, res) => {
   res.send("Frame Grabber API working");
 });
 
+// ✅ POST: كيستقبل JSON فـ body: { "url": "..." }
 app.post("/youtube", (req, res) => {
-  const url = req.body.url;
+  const url = req.body?.url;
 
-  if (!url) {
-    return res.status(400).json({
-      error: "No URL provided"
-    });
-  }
+  if (!url) return res.status(400).json({ error: "No URL provided" });
+  if (!/^https?:\/\//i.test(url)) return res.status(400).json({ error: "Invalid URL" });
 
   const cmd = `yt-dlp -f "best[ext=mp4]/best" -g "${url}"`;
 
-  exec(cmd, (error, stdout, stderr) => {
+  exec(cmd, { maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
     if (error) {
       return res.status(500).json({
         error: "yt-dlp failed",
-        details: stderr
+        details: (stderr || error.message || "").slice(0, 5000),
       });
     }
 
-    const directUrl = stdout.trim().split("\n")[0];
+    const directUrl = (stdout || "").trim().split("\n")[0];
+    if (!directUrl) return res.status(500).json({ error: "No direct URL returned" });
 
-    res.json({
-      mp4Url: directUrl
-    });
+    return res.json({ directUrl, note: "This link is temporary and may expire." });
   });
 });
 
-const PORT = process.env.PORT || 3000;
+// ✅ GET: باش يخدم فالمتصفح: /youtube?url=...
+app.get("/youtube", (req, res) => {
+  const url = req.query?.url;
 
-app.listen(PORT, () => {
-  console.log("Server running on port " + PORT);
-});
+  if (!url) return res.status(400).json({ error: "No URL provided" });
+  if (!/^https?:\/\//i.test(url)) return res.status(400).json({ error: "Invalid URL" });
+
+  const cmd = `yt-dlp -f "best[ext=mp4]/best" -g "${url}"`;
+
+  exec(cmd, { maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+    if (error) {
+      return res.status(500).json({
+       
