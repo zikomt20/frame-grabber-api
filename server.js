@@ -1,8 +1,9 @@
 const express = require("express");
 const cors = require("cors");
-const { exec } = require("child_process");
+const ytdlp = require("yt-dlp-exec");
 
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
@@ -10,39 +11,53 @@ app.get("/", (req, res) => {
   res.send("Frame Grabber API working");
 });
 
-function handleYoutube(url, res) {
-  if (!url) return res.status(400).json({ error: "No URL provided" });
+// GET من المتصفح
+app.get("/youtube", async (req, res) => {
+  try {
+    const url = req.query.url;
 
-  if (!/^https?:\/\//i.test(url)) {
-    return res.status(400).json({ error: "Invalid URL" });
-  }
-
-  const cmd = `yt-dlp -f "best[ext=mp4]/best" -g "${url}"`;
-
-  exec(cmd, { maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
-    if (error) {
-      return res.status(500).json({
-        error: "yt-dlp failed",
-        details: (stderr || error.message || "").slice(0, 3000),
-      });
+    if (!url) {
+      return res.status(400).send("No URL provided");
     }
 
-    const directUrl = (stdout || "").trim().split("\n")[0];
-    if (!directUrl) return res.status(500).json({ error: "No direct URL returned" });
+    const output = await ytdlp(url, {
+      getUrl: true,
+      format: "best[ext=mp4]/best"
+    });
 
-    return res.json({ directUrl });
-  });
-}
+    const directUrl = output.toString().trim().split("\n")[0];
 
-// ✅ هادي باش يولي يخدم فالمتصفح (GET)
-app.get("/youtube", (req, res) => {
-  handleYoutube(req.query.url, res);
+    return res.redirect(directUrl);
+
+  } catch (err) {
+    return res.status(500).json({
+      error: "yt-dlp failed",
+      details: err.message
+    });
+  }
 });
 
-// ✅ هادي باش يولي يخدم فـ Hoppscotch (POST)
-app.post("/youtube", (req, res) => {
-  handleYoutube(req.body?.url, res);
+// POST (اختياري)
+app.post("/youtube", async (req, res) => {
+  try {
+    const url = req.body.url;
+
+    const output = await ytdlp(url, {
+      getUrl: true,
+      format: "best[ext=mp4]/best"
+    });
+
+    const directUrl = output.toString().trim().split("\n")[0];
+
+    res.json({ directUrl });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Server running on port", PORT));
+
+app.listen(PORT, () => {
+  console.log("Server running on port", PORT);
+});
