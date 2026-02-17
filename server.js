@@ -30,19 +30,19 @@ function handleYoutube(url, res) {
     const directUrl = (stdout || "").trim().split("\n")[0];
     if (!directUrl) return res.status(500).json({ error: "No direct URL returned" });
 
-    return res.json({ directUrl, note: "Temporary link, may expire." });
+    return res.json({ directUrl });
   });
 }
 
-// ✅ GET باش تخدم فالمتصفح: /youtube?url=...
+// ✅ هادي باش يولي يخدم فالمتصفح (GET)
 app.get("/youtube", (req, res) => {
   handleYoutube(req.query.url, res);
 });
 
-// ✅ POST باش تخدم فـ Hoppscotch
+// ✅ هادي باش يولي يخدم فـ Hoppscotch (POST)
 app.post("/youtube", (req, res) => {
   handleYoutube(req.body?.url, res);
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Server running on port", PORT));l
+app.listen(PORT, () => console.log("Server running on port", PORT));
